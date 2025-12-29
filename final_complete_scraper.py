@@ -174,8 +174,8 @@ def save_markets(markets, filename="btc_markets_complete.json"):
     print(f"   Actifs: {active}")
 
     if resolved > 0:
-        up_count = sum(1 for m in markets if m.get('result', '').startswith('Up'))
-        down_count = sum(1 for m in markets if m.get('result', '').startswith('Down'))
+        up_count = sum(1 for m in markets if m.get('result') and m.get('result').startswith('Up'))
+        down_count = sum(1 for m in markets if m.get('result') and m.get('result').startswith('Down'))
         print(f"\n   Résultats:")
         print(f"   🟢 Up: {up_count} ({up_count/resolved*100:.1f}%)")
         print(f"   🔴 Down: {down_count} ({down_count/resolved*100:.1f}%)")
