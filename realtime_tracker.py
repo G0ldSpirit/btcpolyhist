@@ -32,6 +32,11 @@ def get_price_from_clob(token_id):
     url = f"{CLOB_API_BASE}/book?token_id={token_id}"
     try:
         response = requests.get(url, timeout=5)
+
+        # 404 = normal pour marchés fermés ou trop récents, pas d'erreur
+        if response.status_code == 404:
+            return None
+
         response.raise_for_status()
         data = response.json()
 
@@ -42,8 +47,11 @@ def get_price_from_clob(token_id):
 
         return None
 
-    except Exception as e:
-        print(f"   ⚠️  Erreur prix token {token_id[:10]}...: {e}")
+    except requests.exceptions.RequestException:
+        # Erreurs réseau silencieuses (timeout, connection, etc.)
+        return None
+    except Exception:
+        # Autres erreurs silencieuses
         return None
 
 def update_market_prices(market):
@@ -221,9 +229,12 @@ def track_markets(markets, interval=30):
             updated_count = 0
 
             # ✅ CORRECTION: Traiter TOUS les marchés (pas juste 50)
+            markets_with_prices = []
+            markets_without_prices = []
+
             for market in markets:
                 if market.get('closed'):
-                    # ✅ CORRECTION: Garder les marchés résolus tels quels
+                    # ✅ CORRECTION: Garder les marchés résolus tels quels (pas d'affichage)
                     updated_markets.append(market)
                     resolved_count += 1
                 else:
@@ -232,14 +243,22 @@ def track_markets(markets, interval=30):
                     updated_market = update_market_prices(market)
                     updated_markets.append(updated_market)
 
-                    # Afficher les prix
+                    # Classer par disponibilité du prix
                     if updated_market.get('up_price') is not None:
-                        up = updated_market['up_price']
-                        down = updated_market['down_price'] or 0
-                        print(f"   📊 {market['time']}: UP {up:.3f} | DOWN {down:.3f}")
+                        markets_with_prices.append((market['time'], updated_market['up_price'], updated_market['down_price'] or 0))
                         updated_count += 1
                     else:
-                        print(f"   ⏳ {market['time']}: Pas de liquidité")
+                        markets_without_prices.append(market['time'])
+
+            # Affichage groupé et propre
+            if markets_with_prices:
+                print(f"\n   💰 Marchés avec prix ({len(markets_with_prices)}):")
+                for time_str, up, down in markets_with_prices:
+                    print(f"      {time_str}: UP {up:.3f} | DOWN {down:.3f}")
+
+            if markets_without_prices:
+                print(f"\n   ⏳ Marchés sans liquidité ({len(markets_without_prices)}):")
+                print(f"      {', '.join(markets_without_prices)}")
 
             # ✅ CORRECTION: Utiliser la liste complète pour les stats
             markets = updated_markets
