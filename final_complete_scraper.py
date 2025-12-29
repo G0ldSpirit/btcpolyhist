@@ -113,8 +113,8 @@ def scrape_markets(days_back=3, days_forward=1):
                     "result": extract_result(market_data),
                     "clob_token_ids": market_data.get("clobTokenIds", []),
                     "volume": market_data.get("volume", "0"),
-                    "outcomes": str(market_data.get("outcomes", [])),
-                    "outcome_prices": str(market_data.get("outcomePrices", []))
+                    "outcomes": market_data.get("outcomes", []),
+                    "outcome_prices": market_data.get("outcomePrices", [])
                 }
 
                 markets.append(market_info)
