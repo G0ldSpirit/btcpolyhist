@@ -103,7 +103,7 @@ def scrape_historical_markets(days_back=7):
     # Scanner uniquement dans le PASSÉ
     today = datetime.now()
     start_date = today - timedelta(days=days_back)
-    end_date = today - timedelta(days=1)  # Jusqu'à hier (pas aujourd'hui)
+    end_date = today  # Jusqu'à aujourd'hui inclus (pour avoir les dernières heures)
 
     print(f"🔍 Scan de l'HISTORIQUE des marchés Bitcoin Up/Down")
     print(f"📅 Période: {start_date.strftime('%Y-%m-%d')} → {end_date.strftime('%Y-%m-%d')}")
