@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Up/Down - Historique</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        /* STREAK CARD */
+        .streak-card {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .streak-title {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .streak-value {
+            font-size: 4em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .streak-type {
+            font-size: 1.5em;
+            color: #666;
+        }
+
+        /* STATS GRID */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-subvalue {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        /* MARKETS TABLE */
+        .section-title {
+            color: white;
+            font-size: 1.8em;
+            margin: 40px 0 20px 0;
+            text-align: center;
+        }
+
+        .markets-table {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #ddd;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .result-up {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .result-down {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .green { color: #4CAF50; }
+        .red { color: #f44336; }
+        .blue { color: #2196F3; }
+        .orange { color: #ff9800; }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.5em;
+            padding: 50px;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .refresh-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Bitcoin Up/Down - Historique</h1>
+        <div class="subtitle">Analyse des séries de résultats</div>
+
+        <button class="refresh-btn" onclick="loadData()">🔄 Actualiser</button>
+
+        <div id="streakCard"></div>
+        <div id="statsGrid" class="stats-grid"></div>
+
+        <h2 class="section-title">📈 Historique des Marchés</h2>
+        <div id="marketsTable" class="markets-table"></div>
+    </div>
+
+    <script>
+        function displayStreak(stats) {
+            const streakCard = document.getElementById('streakCard');
+
+            if (!stats || stats.total_resolved === 0) {
+                streakCard.innerHTML = `
+                    <div class="streak-card">
+                        <div class="streak-title">⏳ En attente de marchés résolus</div>
+                        <div class="streak-type">Aucune série disponible pour le moment</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const color = stats.current_type === 'UP' ? 'green' : 'red';
+            const emoji = stats.current_type === 'UP' ? '🟢' : '🔴';
+
+            streakCard.innerHTML = `
+                <div class="streak-card">
+                    <div class="streak-title">Série Actuelle</div>
+                    <div class="streak-value ${color}">${emoji} ${stats.current_streak}</div>
+                    <div class="streak-type">${stats.current_type} consécutifs</div>
+                </div>
+            `;
+        }
+
+        function displayStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+
+            if (!stats || stats.total_resolved === 0) {
+                statsGrid.innerHTML = `<div class="loading">⏳ En attente de données...</div>`;
+                return;
+            }
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Total Résolus</div>
+                    <div class="stat-value blue">${stats.total_resolved}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">🟢 UP</div>
+                    <div class="stat-value green">${stats.up_count}</div>
+                    <div class="stat-subvalue">${stats.up_percentage}%</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">🔴 DOWN</div>
+                    <div class="stat-value red">${stats.down_count}</div>
+                    <div class="stat-subvalue">${stats.down_percentage}%</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Records</div>
+                    <div class="stat-value orange">${Math.max(stats.max_up_streak, stats.max_down_streak)}</div>
+                    <div class="stat-subvalue">
+                        UP: ${stats.max_up_streak} | DOWN: ${stats.max_down_streak}
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayMarkets(markets) {
+            const marketsTable = document.getElementById('marketsTable');
+
+            if (!markets || markets.length === 0) {
+                marketsTable.innerHTML = '<div class="loading">Aucun marché disponible</div>';
+                return;
+            }
+
+            // Filtrer seulement les marchés résolus avec résultat
+            const resolved = markets.filter(m => m.closed && m.result);
+
+            // Trier par date et heure (plus récent en premier)
+            const sorted = [...resolved].sort((a, b) => {
+                if (a.date !== b.date) return b.date.localeCompare(a.date);
+                return b.time.localeCompare(a.time);
+            });
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Heure</th>
+                            <th>Résultat</th>
+                            <th>Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            sorted.forEach(market => {
+                const isUp = market.result.includes('Up');
+                const resultClass = isUp ? 'result-up' : 'result-down';
+                const volume = parseFloat(market.volume).toLocaleString('fr-FR', {maximumFractionDigits: 0});
+
+                tableHTML += `
+                    <tr>
+                        <td>${market.date}</td>
+                        <td><strong>${market.time.toUpperCase()}</strong></td>
+                        <td class="${resultClass}">${market.result}</td>
+                        <td>$${volume}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            marketsTable.innerHTML = tableHTML;
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch('btc_history.json');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                displayStreak(data.stats);
+                displayStats(data.stats);
+                displayMarkets(data.markets);
+
+            } catch (error) {
+                console.error('Erreur chargement:', error);
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="error">
+                        ❌ Erreur de chargement<br>
+                        <small>${error.message}</small><br>
+                        <small>Assurez-vous d'avoir lancé scrape_history.py</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Charger les données au démarrage
+        loadData();
+    </script>
+</body>
+</html>
