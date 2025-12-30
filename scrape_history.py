@@ -58,8 +58,22 @@ def extract_result(market_data, debug=False):
     outcome_prices = market_data.get("outcomePrices", [])
     outcomes = market_data.get("outcomes", [])
 
+    # ✅ FIX CRITIQUE: Parser les strings JSON en listes
+    if isinstance(outcome_prices, str):
+        try:
+            outcome_prices = json.loads(outcome_prices)
+        except:
+            return None
+
+    if isinstance(outcomes, str):
+        try:
+            outcomes = json.loads(outcomes)
+        except:
+            return None
+
     if debug:
         print(f"    DEBUG: closed={market_data.get('closed')}")
+        print(f"    DEBUG APRÈS PARSING:")
         print(f"    DEBUG: outcomes={outcomes} (type: {type(outcomes)})")
         print(f"    DEBUG: outcome_prices={outcome_prices} (type: {type(outcome_prices)})")
         if len(outcome_prices) >= 2:
