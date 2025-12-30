@@ -50,13 +50,21 @@ def generate_hours_list():
             hours.append(f"{h-12}pm")
     return hours
 
-def extract_result(market_data):
+def extract_result(market_data, debug=False):
     """Extrait le résultat d'un marché fermé"""
     if not market_data.get("closed", False):
         return None
 
     outcome_prices = market_data.get("outcomePrices", [])
     outcomes = market_data.get("outcomes", [])
+
+    if debug:
+        print(f"    DEBUG: closed={market_data.get('closed')}")
+        print(f"    DEBUG: outcomes={outcomes} (type: {type(outcomes)})")
+        print(f"    DEBUG: outcome_prices={outcome_prices} (type: {type(outcome_prices)})")
+        if len(outcome_prices) >= 2:
+            print(f"    DEBUG: outcome_prices[0]={outcome_prices[0]} (type: {type(outcome_prices[0])})")
+            print(f"    DEBUG: outcome_prices[0] == '1' ? {outcome_prices[0] == '1'}")
 
     if len(outcome_prices) >= 2 and len(outcomes) >= 2:
         if outcome_prices[0] == "1":
@@ -89,6 +97,7 @@ def scrape_historical_markets(days_back=7):
 
     total_found = 0
     total_resolved = 0
+    debug_shown = False  # Pour afficher le debug une seule fois
 
     current_date = start_date
 
@@ -103,8 +112,12 @@ def scrape_historical_markets(days_back=7):
             market_data = get_market_by_slug(slug)
 
             if market_data:
-                # Extraire le résultat
-                result = extract_result(market_data)
+                # Extraire le résultat (avec debug pour le premier marché fermé)
+                is_closed = market_data.get("closed", False)
+                enable_debug = is_closed and not debug_shown
+                result = extract_result(market_data, debug=enable_debug)
+                if enable_debug:
+                    debug_shown = True
 
                 market_info = {
                     "slug": slug,
