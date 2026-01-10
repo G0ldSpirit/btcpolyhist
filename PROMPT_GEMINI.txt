@@ -1,0 +1,149 @@
+# Projet : Scraper de Marchés Bitcoin Up/Down sur Polymarket
+
+## Objectif
+Créer un système Python pour tracker et analyser les résultats horaires des marchés "Bitcoin Up or Down" sur Polymarket, calculer les séries (streaks) de résultats consécutifs, et afficher les statistiques dans un dashboard web.
+
+## Architecture des APIs Polymarket
+
+### 1. API Gamma (Récupération des marchés)
+**Endpoint :** `https://gamma-api.polymarket.com/markets?slug={slug}`
+**Méthode :** GET
+**Authentification :** Aucune (API publique)
+
+**Format des slugs :**
+```
+bitcoin-up-or-down-{month}-{day}-{hour}{am/pm}-et
+```
+
+Exemples :
+- `bitcoin-up-or-down-december-30-9am-et`
+- `bitcoin-up-or-down-december-29-11pm-et`
+
+**Structure de la réponse JSON :**
+```json
+{
+  "slug": "bitcoin-up-or-down-december-30-1am-et",
+  "conditionId": "0x...",
+  "question": "Bitcoin Up or Down - December 30, 1AM ET",
+  "closed": true,
+  "outcomes": ["Up", "Down"],
+  "outcomePrices": ["1", "0"],
+  "clobTokenIds": ["token_id_up", "token_id_down"],
+  "volume": "199463.67"
+}
+```
+
+**⚠️ IMPORTANT :** Les champs `outcomes` et `outcomePrices` peuvent être retournés comme **strings JSON** `"[\"Up\", \"Down\"]"` au lieu de listes Python. Il faut les parser avec `json.loads()`.
+
+### 2. API CLOB (Prix en temps réel)
+**Endpoint :** `https://clob.polymarket.com/book?token_id={clob_token_id}`
+**Pour les prix temps réel uniquement** (optionnel pour historique)
+
+## Logique d'Extraction des Résultats
+
+**Pour déterminer le gagnant d'un marché fermé :**
+
+```python
+outcome_prices = market_data.get("outcomePrices", [])
+outcomes = market_data.get("outcomes", [])
+
+# Parser si c'est une string JSON
+if isinstance(outcome_prices, str):
+    outcome_prices = json.loads(outcome_prices)
+if isinstance(outcomes, str):
+    outcomes = json.loads(outcomes)
+
+# Le gagnant a un prix de "1"
+if outcome_prices[0] == "1":
+    resultat = outcomes[0]  # "Up"
+elif outcome_prices[1] == "1":
+    resultat = outcomes[1]  # "Down"
+```
+
+## Génération des Heures
+
+Les marchés utilisent le format 12 heures (AM/PM) :
+```python
+hours = ["12am", "1am", "2am", ..., "11am", "12pm", "1pm", ..., "11pm"]
+```
+
+## Calcul des Séries (Streaks)
+
+Pour analyser les séries de UP/DOWN consécutifs :
+1. Filtrer les marchés résolus avec résultat
+2. Trier par date et heure chronologique
+3. Compter les UP/DOWN consécutifs
+4. Identifier la série actuelle
+5. Calculer les records (max streak UP et DOWN)
+
+## Fonctionnalités à Implémenter
+
+### Script 1 : scrape_history.py
+- Scanner X jours d'historique (par défaut 2-7 jours)
+- Récupérer uniquement les marchés résolus
+- Calculer les statistiques (total, UP%, DOWN%, streaks)
+- Sauvegarder dans `btc_history.json`
+
+### Script 2 : history.html (Dashboard)
+- Charger `btc_history.json`
+- Afficher la série actuelle (grande carte)
+- Afficher les stats (4 cartes : Total, UP%, DOWN%, Records)
+- Tableau listant tous les marchés résolus
+
+## Structure des Fichiers
+
+```
+projet/
+├── scrape_history.py       # Scraper historique
+├── history.html            # Dashboard web
+├── btc_history.json        # Données générées
+└── requirements.txt        # requests
+```
+
+## Format de Sortie JSON Souhaité
+
+```json
+{
+  "last_update": "2025-12-30T10:00:00",
+  "markets": [
+    {
+      "slug": "...",
+      "date": "2025-12-30",
+      "time": "1am",
+      "closed": true,
+      "result": "Up ✅",
+      "volume": "199463"
+    }
+  ],
+  "stats": {
+    "total_resolved": 49,
+    "up_count": 22,
+    "down_count": 27,
+    "current_streak": 1,
+    "current_type": "UP",
+    "max_up_streak": 6,
+    "max_down_streak": 7,
+    "up_percentage": 44.9,
+    "down_percentage": 55.1
+  }
+}
+```
+
+## Points Critiques à ne pas Oublier
+
+1. ✅ **Parser les strings JSON** pour outcomes et outcomePrices
+2. ✅ **Vérifier que closed=true** avant d'extraire le résultat
+3. ✅ **Gérer les erreurs 404** (marchés inexistants)
+4. ✅ **Respecter les délais** entre requêtes (0.1s minimum)
+5. ✅ **Trier chronologiquement** avant de calculer les streaks
+6. ✅ **Les heures sont en Eastern Time (ET)** pas UTC
+
+## Contraintes
+
+- Pas d'authentification requise
+- Rate limiting possible (ajouter des délais)
+- Les marchés trop anciens (>7 jours) peuvent ne plus avoir de résultats dans l'API
+- Scanner "aujourd'hui" inclus pour avoir les dernières heures fermées
+
+## Question
+Peux-tu créer le code Python complet pour le scraper d'historique et le dashboard HTML avec toutes ces spécifications ?
