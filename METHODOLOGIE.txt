@@ -1,0 +1,189 @@
+MÉTHODOLOGIE : Comment j'ai découvert les APIs Polymarket pour scraper les marchés Bitcoin Up/Down
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 1 : OBSERVER LES URLs DU SITE
+
+En naviguant sur Polymarket, j'ai remarqué que les URLs des marchés Bitcoin suivent un pattern clair :
+
+https://polymarket.com/event/bitcoin-up-or-down-december-29-9am-et
+                              └─────────────────────────────────────┘
+                                         C'est le "slug"
+
+Pattern découvert :
+bitcoin-up-or-down-{month}-{day}-{hour}{am/pm}-et
+
+Exemples :
+- bitcoin-up-or-down-december-29-9am-et
+- bitcoin-up-or-down-december-30-1pm-et
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 2 : UTILISER LES DEVTOOLS DU NAVIGATEUR
+
+Sur le site Polymarket, j'ai ouvert les DevTools (F12) :
+
+1. Ouvrir n'importe quel marché Bitcoin Up/Down
+2. Appuyer sur F12 pour ouvrir les DevTools
+3. Aller dans l'onglet "Network" (Réseau)
+4. Rafraîchir la page (F5)
+5. Observer les requêtes HTTP qui apparaissent
+
+Ce que j'ai trouvé :
+Request URL: https://gamma-api.polymarket.com/markets?slug=bitcoin-up-or-down-december-29-9am-et
+Method: GET
+Status Code: 200
+
+BINGO ! L'API publique était là, visible dans les requêtes réseau !
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 3 : TESTER L'API MANUELLEMENT
+
+Option A - Avec curl dans le terminal :
+
+curl "https://gamma-api.polymarket.com/markets?slug=bitcoin-up-or-down-december-29-9am-et"
+
+
+Option B - Avec Python :
+
+import requests
+import json
+
+slug = "bitcoin-up-or-down-december-29-9am-et"
+url = f"https://gamma-api.polymarket.com/markets?slug={slug}"
+
+response = requests.get(url)
+data = response.json()
+print(json.dumps(data, indent=2))
+
+
+Résultat : L'API retourne un JSON complet avec toutes les données du marché !
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 4 : ANALYSER LA STRUCTURE JSON RETOURNÉE
+
+Exemple de réponse de l'API Gamma :
+
+{
+  "slug": "bitcoin-up-or-down-december-29-9am-et",
+  "conditionId": "0x875ac6ab1b3dfa1ec788f9af85e7db6f934a52de994bd24f02f4f9cd6b9d6791b",
+  "question": "Bitcoin Up or Down - December 29, 9AM ET",
+  "closed": true,
+  "outcomes": ["Up", "Down"],
+  "outcomePrices": ["1", "0"],
+  "clobTokenIds": [
+    "32335030373487383042649098981612262759652263219845507081122077665830223113679",
+    "115679681161201379691123057461457097804093363865171898940922153203649155991314"
+  ],
+  "volume": "199462.67787"
+}
+
+Découvertes importantes :
+
+1. outcomes[0] = "Up", outcomes[1] = "Down"
+2. Le gagnant a outcomePrices = "1"
+   - Si outcomePrices[0] = "1" → UP a gagné
+   - Si outcomePrices[1] = "1" → DOWN a gagné
+3. clobTokenIds sont les IDs pour récupérer les prix en temps réel
+4. closed = true signifie que le marché est résolu
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 5 : DÉCOUVRIR L'API CLOB (PRIX TEMPS RÉEL)
+
+En continuant à observer l'onglet Network des DevTools, j'ai trouvé :
+
+Request URL: https://clob.polymarket.com/book?token_id=32335030373487383042649098981612262759652263219845507081122077665830223113679
+Method: GET
+
+Cette API retourne les prix en temps réel (order book) :
+
+{
+  "bids": [
+    {"price": "0.52", "size": "1000"},
+    {"price": "0.51", "size": "500"}
+  ],
+  "asks": [
+    {"price": "0.53", "size": "750"}
+  ]
+}
+
+Le meilleur bid (bids[0].price) = prix actuel du marché
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## ÉTAPE 6 : IDENTIFIER LES PIÈGES
+
+🚨 PIÈGE CRITIQUE DÉCOUVERT :
+
+Les champs outcomes et outcomePrices peuvent être retournés comme STRINGS JSON au lieu de listes Python !
+
+Au lieu de :
+"outcomes": ["Up", "Down"]
+
+L'API retourne parfois :
+"outcomes": "[\"Up\", \"Down\"]"  ← C'est une STRING !
+
+Solution : Parser avec json.loads()
+
+if isinstance(outcome_prices, str):
+    outcome_prices = json.loads(outcome_prices)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## OUTILS UTILISÉS
+
+1. Navigateur Web (Chrome/Firefox/Edge)
+   - DevTools (F12)
+   - Tab Network pour voir les requêtes
+   - Tab Console pour tester du code JavaScript
+
+2. Terminal / Ligne de commande
+   - curl pour tester les APIs
+   - python pour parser le JSON
+
+3. Python requests
+   - Automatiser les requêtes
+   - Parser les réponses JSON
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## RÉSUMÉ DE LA MÉTHODOLOGIE
+
+1. ✅ Observer les URLs du site → Trouver le pattern des slugs
+2. ✅ F12 → Network → Voir les requêtes API
+3. ✅ Tester avec curl/Python → Comprendre la structure JSON
+4. ✅ Analyser les données → Identifier les champs importants
+5. ✅ Chercher d'autres APIs → Trouver CLOB pour les prix
+6. ✅ Tester différents scénarios → Découvrir les pièges
+7. ✅ Créer des scripts de test → Valider la logique
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## POUR DÉCOUVRIR D'AUTRES APIs SIMILAIRES
+
+La même méthodologie fonctionne pour n'importe quel site :
+
+1. Aller sur le site
+2. F12 → Network
+3. Filtrer par XHR ou Fetch (requêtes API)
+4. Observer les Request URLs
+5. Tester les endpoints avec curl/Python
+6. Analyser la structure JSON
+7. Créer un scraper
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## NOTES IMPORTANTES
+
+- Toutes ces APIs Polymarket sont PUBLIQUES (pas d'auth requise)
+- Respecter les rate limits (ajouter des délais entre requêtes)
+- Les données peuvent changer de format (toujours tester)
+- Les marchés anciens (>7 jours) peuvent ne plus avoir de données
+- Les heures sont en Eastern Time (ET), pas UTC
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Cette méthodologie peut être appliquée à n'importe quelle plateforme web pour découvrir leurs APIs !
